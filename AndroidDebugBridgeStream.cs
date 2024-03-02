@@ -22,7 +22,6 @@
 * SOFTWARE.
 */
 using System;
-using System.Diagnostics;
 using System.Threading;
 
 namespace AndroidDebugBridge
@@ -135,8 +134,6 @@ namespace AndroidDebugBridge
 
         public void WaitForAcknowledgement()
         {
-            Debug.WriteLine("Waiting!");
-
             while (!ReceivedOK)
             {
                 Thread.Sleep(100);

@@ -23,7 +23,6 @@
 */
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Text;
 
 namespace AndroidDebugBridge
@@ -59,13 +58,6 @@ namespace AndroidDebugBridge
 
         private void HandleIncomingMessage(AndroidDebugBridgeMessage incomingMessage)
         {
-            Debug.WriteLine($"< new AndroidDebugBridgeMessage(AndroidDebugBridgeCommands.{incomingMessage.CommandIdentifier}, 0x{incomingMessage.FirstArgument:X8}, 0x{incomingMessage.FirstArgument:X8}, );");
-            if (incomingMessage.Payload != null)
-            {
-                Debug.WriteLine(BitConverter.ToString(incomingMessage.Payload));
-                //Debug.WriteLine(Encoding.UTF8.GetString(incomingMessage.Payload));
-            }
-
             if (incomingMessage.CommandIdentifier != AndroidDebugBridgeCommands.CNXN && incomingMessage.CommandIdentifier != AndroidDebugBridgeCommands.AUTH)
             {
                 bool HandledExternally = false;

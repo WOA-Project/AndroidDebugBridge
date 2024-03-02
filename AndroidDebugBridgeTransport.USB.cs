@@ -23,7 +23,6 @@
 */
 using MadWizard.WinUSBNet;
 using System;
-using System.Diagnostics;
 using System.Threading;
 
 namespace AndroidDebugBridge
@@ -117,13 +116,6 @@ namespace AndroidDebugBridge
 
         internal void SendMessage(AndroidDebugBridgeMessage outgoingMessage)
         {
-            Debug.WriteLine($"> new AndroidDebugBridgeMessage(AndroidDebugBridgeCommands.{outgoingMessage.CommandIdentifier}, 0x{outgoingMessage.FirstArgument:X8}, 0x{outgoingMessage.FirstArgument:X8}, );");
-            if (outgoingMessage.Payload != null)
-            {
-                Debug.WriteLine(BitConverter.ToString(outgoingMessage.Payload));
-                //Debug.WriteLine(Encoding.UTF8.GetString(outgoingMessage.Payload));
-            }
-
             byte[] OutgoingMessage = AndroidDebugBridgeMessaging.GetCommandPacket(outgoingMessage.CommandIdentifier, outgoingMessage.FirstArgument, outgoingMessage.SecondArgument, outgoingMessage.Payload);
             WriteToUsb(OutgoingMessage);
 
