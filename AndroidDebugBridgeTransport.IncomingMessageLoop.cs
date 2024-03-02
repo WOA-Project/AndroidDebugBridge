@@ -1,0 +1,132 @@
+﻿/*
+* MIT License
+* 
+* Copyright (c) 2024 The DuoWOA authors
+* 
+* Permission is hereby granted, free of charge, to any person obtaining a copy
+* of this software and associated documentation files (the "Software"), to deal
+* in the Software without restriction, including without limitation the rights
+* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+* copies of the Software, and to permit persons to whom the Software is
+* furnished to do so, subject to the following conditions:
+* 
+* The above copyright notice and this permission notice shall be included in all
+* copies or substantial portions of the Software.
+* 
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+* SOFTWARE.
+*/
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Text;
+
+namespace AndroidDebugBridge
+{
+    public partial class AndroidDebugBridgeTransport
+    {
+        private uint LocalId = 0;
+
+        private readonly List<AndroidDebugBridgeStream> Streams = new();
+
+        public AndroidDebugBridgeStream OpenStream(string OpenString)
+        {
+            AndroidDebugBridgeStream stream = new(this, ++LocalId, OpenString);
+            Streams.Add(stream);
+            stream.Open();
+
+            stream.DataClosed += (object? sender, EventArgs args) =>
+            {
+                Streams.Remove((sender as AndroidDebugBridgeStream)!);
+            };
+
+            return stream;
+        }
+
+        private void IncomingMessageLoop()
+        {
+            ReadMessageAsync((AndroidDebugBridgeMessage incomingMessage) =>
+            {
+                HandleIncomingMessage(incomingMessage);
+                IncomingMessageLoop();
+            }, VerifyCrc: false);
+        }
+
+        private void HandleIncomingMessage(AndroidDebugBridgeMessage incomingMessage)
+        {
+            Debug.WriteLine($"< new AndroidDebugBridgeMessage(AndroidDebugBridgeCommands.{incomingMessage.CommandIdentifier}, 0x{incomingMessage.FirstArgument:X8}, 0x{incomingMessage.FirstArgument:X8}, );");
+            if (incomingMessage.Payload != null)
+            {
+                Debug.WriteLine(BitConverter.ToString(incomingMessage.Payload));
+                //Debug.WriteLine(Encoding.UTF8.GetString(incomingMessage.Payload));
+            }
+
+            if (incomingMessage.CommandIdentifier != AndroidDebugBridgeCommands.CNXN && incomingMessage.CommandIdentifier != AndroidDebugBridgeCommands.AUTH)
+            {
+                bool HandledExternally = false;
+                foreach (AndroidDebugBridgeStream stream in Streams)
+                {
+                    if (stream.RemoteIdentifier != 0 && stream.RemoteIdentifier == incomingMessage.FirstArgument)
+                    {
+                        HandledExternally = stream.HandleIncomingMessage(incomingMessage);
+                        break;
+                    }
+                    else if (stream.RemoteIdentifier == 0)
+                    {
+                        stream.RemoteIdentifier = incomingMessage.FirstArgument;
+                        HandledExternally = stream.HandleIncomingMessage(incomingMessage);
+                    }
+                }
+
+                if (HandledExternally)
+                {
+                    return;
+                }
+            }
+
+            switch (incomingMessage.CommandIdentifier)
+            {
+                case AndroidDebugBridgeCommands.CNXN:
+                    {
+                        PhoneSupportedProtocolVersion = incomingMessage.FirstArgument;
+                        PhoneConnectionString = Encoding.ASCII.GetString(incomingMessage.Payload!);
+                        IsConnected = true;
+                        break;
+                    }
+                case AndroidDebugBridgeCommands.AUTH:
+                    {
+                        if (incomingMessage.FirstArgument == 1)
+                        {
+                            // Real ADB does this if already accepted once
+                            //
+                            // -> AUTH (type 2) + Signed Token with RSA Private Key
+                            //
+                            // If ok:
+                            //   <- CNXN + System Information
+                            //
+                            // If not:
+                            //   <- AUTH (type 1) + Token
+                            //   -> AUTH (type 3) + RSA Public Key
+                            //   <- CNXN + System Information
+
+                            // Token: 1
+                            // Signature: 2
+                            // RSA Public: 3
+
+                            // -> AUTH (type 3) + Public Key
+                            byte[] PublicKey = GetAdbPublicKeyPayload();
+                            AndroidDebugBridgeMessage AuthType3 = AndroidDebugBridgeMessage.GetAuthMessage(3, PublicKey);
+                            SendMessage(AuthType3);
+                        }
+
+                        break;
+                    }
+            }
+        }
+    }
+}
