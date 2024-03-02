@@ -9,6 +9,8 @@ Currently the following features are not supported:
 - Pull
 - List
 - Single command execution
+- Token signing for authentication
+- Legacy Shell interface (only v2 is supported at the moment)
 
 These will be addressed at a later time.
 
