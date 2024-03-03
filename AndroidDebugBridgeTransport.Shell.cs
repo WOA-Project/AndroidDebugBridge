@@ -23,10 +23,11 @@
 */
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
+using System.Threading;
 
 namespace AndroidDebugBridge
 {
@@ -162,36 +163,49 @@ namespace AndroidDebugBridge
 
             bool closed = false;
 
-            Task consoleInputThread = Task.Run(() =>
+            BackgroundWorker consoleInputWorker = new()
             {
-                while (!closed)
+                WorkerSupportsCancellation = true
+            };
+
+            consoleInputWorker.DoWork += (object? sender, DoWorkEventArgs e) =>
+            {
+                ConsoleKeyInfo readKey = Console.ReadKey(true);
+
+                if (!closed && readKey.KeyChar != '\0')
                 {
-                    ConsoleKeyInfo readKey = Console.ReadKey(true);
+                    byte[] buffer = Encoding.UTF8.GetBytes(readKey.KeyChar.ToString());
+                    byte[] StringLength = BitConverter.GetBytes(buffer.Length);
 
-                    if (readKey.KeyChar != '\0')
-                    {
-                        byte[] buffer = Encoding.UTF8.GetBytes(readKey.KeyChar.ToString());
-                        byte[] StringLength = BitConverter.GetBytes(buffer.Length);
+                    List<byte> consoleInputData = buffer.ToList();
+                    consoleInputData.Insert(0, 0x00);
+                    consoleInputData.InsertRange(1, StringLength);
 
-                        List<byte> consoleInputData = buffer.ToList();
-                        consoleInputData.Insert(0, 0x00);
-                        consoleInputData.InsertRange(1, StringLength);
-
-                        stream.Write(consoleInputData.ToArray());
-                    }
-                    else
-                    {
-
-                    }
+                    stream.Write(consoleInputData.ToArray());
                 }
-            });
+            };
+
+            consoleInputWorker.RunWorkerCompleted += (object? sender, RunWorkerCompletedEventArgs e) =>
+            {
+                if (!closed)
+                {
+                    consoleInputWorker.RunWorkerAsync();
+                }
+            };
 
             stream.DataClosed += (object? sender, EventArgs args) =>
             {
+                consoleInputWorker.CancelAsync();
                 closed = true;
             };
 
-            consoleInputThread.Wait();
+            consoleInputWorker.RunWorkerAsync();
+
+            // Wait til the stream is closed
+            while (!closed)
+            {
+                Thread.Sleep(100);
+            }
         }
     }
 }
