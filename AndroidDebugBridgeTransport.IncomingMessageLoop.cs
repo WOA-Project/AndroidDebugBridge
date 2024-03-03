@@ -86,7 +86,29 @@ namespace AndroidDebugBridge
                 case AndroidDebugBridgeCommands.CNXN:
                     {
                         PhoneSupportedProtocolVersion = incomingMessage.FirstArgument;
-                        PhoneConnectionString = Encoding.ASCII.GetString(incomingMessage.Payload!);
+
+                        string ConnectionString = Encoding.UTF8.GetString(incomingMessage.Payload!);
+
+                        PhoneConnectionEnvironment = ConnectionString.Split("::")[0];
+
+                        Dictionary<string, string> ConnectionVariables = new();
+
+                        foreach (string variable in ConnectionString.Split("::")[1].Split(';'))
+                        {
+                            string[] variableParts = variable.Split('=');
+
+                            if (variableParts[0] == "features")
+                            {
+                                PhoneConnectionFeatures = variableParts[1].Split(',');
+                            }
+                            else
+                            {
+                                ConnectionVariables.Add(variableParts[0], variableParts[1]);
+                            }
+                        }
+
+                        PhoneConnectionVariables = ConnectionVariables;
+
                         IsConnected = true;
                         break;
                     }

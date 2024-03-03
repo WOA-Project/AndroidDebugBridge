@@ -37,17 +37,71 @@ namespace AndroidDebugBridge
 
             stream.DataReceived += (object? sender, byte[] incomingMessage) =>
             {
+                // 0: STDIN
+                // 1: STDOUT
+                // 2: STDERR
+                // 3: EXIT
+                // 4: Close STDIN
+                // 5: Window Size Change
+
                 byte messageType = incomingMessage[0];
-                if (messageType == 1)
+                if (messageType == 0)
                 {
-                    uint length = BitConverter.ToUInt32(incomingMessage[1..5]);
-                    Console.Write(Encoding.UTF8.GetString(incomingMessage[5..((int)length + 5)]));
+                    // Can't do much here, STDIN is not writable ofc...
+                }
+                else if (messageType == 1)
+                {
+                    uint packetArgument = BitConverter.ToUInt32(incomingMessage[1..5]);
+                    char[] output = Encoding.UTF8.GetChars(incomingMessage[5..]);
+
+                    for (int i = 0; i < output.Length; i++)
+                    {
+                        char ch = output[i];
+                        if (ch == 0x01)
+                        {
+                            char[] escapeArgument = output[(i + 1)..(i + 5)];
+                            i += 4;
+                        }
+                        else
+                        {
+                            Console.Out.Write(ch);
+                        }
+                    }
+
+                    (sender as AndroidDebugBridgeStream)?.SendAcknowledgement();
+                }
+                else if (messageType == 2)
+                {
+                    uint packetArgument = BitConverter.ToUInt32(incomingMessage[1..5]);
+                    char[] output = Encoding.UTF8.GetChars(incomingMessage[5..]);
+
+                    for (int i = 0; i < output.Length; i++)
+                    {
+                        char ch = output[i];
+                        if (ch == 0x01)
+                        {
+                            char[] escapeArgument = output[(i + 1)..(i + 5)];
+                            i += 4;
+                        }
+                        else
+                        {
+                            Console.Error.Write(ch);
+                        }
+                    }
 
                     (sender as AndroidDebugBridgeStream)?.SendAcknowledgement();
                 }
                 else if (messageType == 3)
                 {
                     // Close notification.
+                }
+                else if (messageType == 4)
+                {
+                    // Close STDIN
+                }
+                else if (messageType == 5)
+                {
+                    // Window size change
                 }
                 else
                 {
@@ -56,7 +110,7 @@ namespace AndroidDebugBridge
             };
 
             // Configure terminal size
-            string terminalConfiguration = $"{Console.WindowWidth}x{Console.WindowHeight},0x0";
+            string terminalConfiguration = $"{Console.WindowHeight}x{Console.WindowWidth},0x0";
 
             byte[] ConfigurationRes = Encoding.UTF8.GetBytes($"{terminalConfiguration}\0");
             byte[] StringLength = BitConverter.GetBytes(ConfigurationRes.Length);

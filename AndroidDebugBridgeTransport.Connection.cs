@@ -22,6 +22,7 @@
 * SOFTWARE.
 */
 using System;
+using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -34,12 +35,22 @@ namespace AndroidDebugBridge
 
         private readonly RSACryptoServiceProvider RSACryptoServiceProvider = new(2048);
 
-        public string PhoneConnectionString
+        public uint PhoneSupportedProtocolVersion
         {
             get; private set;
         }
 
-        public uint PhoneSupportedProtocolVersion
+        public string PhoneConnectionEnvironment
+        {
+            get; private set;
+        }
+
+        public IReadOnlyDictionary<string, string> PhoneConnectionVariables
+        {
+            get; private set;
+        }
+
+        public IReadOnlyList<string> PhoneConnectionFeatures
         {
             get; private set;
         }

@@ -23,6 +23,7 @@
 */
 using MadWizard.WinUSBNet;
 using System;
+using System.Collections.Generic;
 
 namespace AndroidDebugBridge
 {
@@ -32,7 +33,9 @@ namespace AndroidDebugBridge
 
         public AndroidDebugBridgeTransport(string DevicePath)
         {
-            PhoneConnectionString = "";
+            PhoneConnectionEnvironment = "";
+            PhoneConnectionVariables = new Dictionary<string, string>();
+            PhoneConnectionFeatures = Array.Empty<string>();
             PhoneSupportedProtocolVersion = 0;
 
             USBDevice = new USBDevice(DevicePath);
