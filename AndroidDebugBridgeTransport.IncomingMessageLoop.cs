@@ -41,7 +41,7 @@ namespace AndroidDebugBridge
 
             stream.DataClosed += (object? sender, EventArgs args) =>
             {
-                Streams.Remove((sender as AndroidDebugBridgeStream)!);
+                _ = Streams.Remove((sender as AndroidDebugBridgeStream)!);
             };
 
             return stream;
@@ -58,7 +58,7 @@ namespace AndroidDebugBridge
 
         private void HandleIncomingMessage(AndroidDebugBridgeMessage incomingMessage)
         {
-            if (incomingMessage.CommandIdentifier != AndroidDebugBridgeCommands.CNXN && incomingMessage.CommandIdentifier != AndroidDebugBridgeCommands.AUTH)
+            if (incomingMessage.CommandIdentifier is not AndroidDebugBridgeCommands.CNXN and not AndroidDebugBridgeCommands.AUTH)
             {
                 bool HandledExternally = false;
                 foreach (AndroidDebugBridgeStream stream in Streams)

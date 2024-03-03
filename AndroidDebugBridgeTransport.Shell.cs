@@ -25,6 +25,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace AndroidDebugBridge
@@ -44,6 +45,8 @@ namespace AndroidDebugBridge
                 // 4: Close STDIN
                 // 5: Window Size Change
 
+                Regex escapeSequences = new(@"(\x9D|\x1B\]).+(\x07|\x9c)|\x1b [F-Nf-n]|\x1b#[3-8]|\x1b%[@Gg]|\x1b[()*+][A-Za-z0-9=`<>]|\x1b[()*+]\""[>4?]|\x1b[()*+]%[0-6=]|\x1b[()*+]&[4-5]|\x1b[-.\/][ABFHLM]|\x1b[6-9Fcl-o=>\|\}~]|(\x9f|\x1b_).+\x9c|(\x90|\x1bP).+\x9c|(\x9B|\x1B\[)[0-?]*[ -\/]*[@-~]|(\x9e|\x1b\^).+\x9c|\x1b[DEHMNOVWXYZ78]");
+
                 byte messageType = incomingMessage[0];
                 if (messageType == 0)
                 {
@@ -52,14 +55,32 @@ namespace AndroidDebugBridge
                 else if (messageType == 1)
                 {
                     uint packetArgument = BitConverter.ToUInt32(incomingMessage[1..5]);
-                    char[] output = Encoding.UTF8.GetChars(incomingMessage[5..]);
+                    string output = Encoding.UTF8.GetString(incomingMessage[5..]);
+
+                    MatchCollection matches = escapeSequences.Matches(output);
+
+                    int[] escapeSequenceIndices = matches.SelectMany(x =>
+                    {
+                        List<int> indices = new();
+                        for (int i = x.Index; i < i + x.Length; i++)
+                        {
+                            indices.Add(i);
+                        }
+                        return indices;
+                    }).ToArray();
 
                     for (int i = 0; i < output.Length; i++)
                     {
+                        if (escapeSequenceIndices.Contains(i))
+                        {
+                            // Ignore for now...
+                            continue;
+                        }
+
                         char ch = output[i];
                         if (ch == 0x01)
                         {
-                            char[] escapeArgument = output[(i + 1)..(i + 5)];
+                            string escapeArgument = output[(i + 1)..(i + 5)];
                             i += 4;
                         }
                         else
@@ -73,14 +94,32 @@ namespace AndroidDebugBridge
                 else if (messageType == 2)
                 {
                     uint packetArgument = BitConverter.ToUInt32(incomingMessage[1..5]);
-                    char[] output = Encoding.UTF8.GetChars(incomingMessage[5..]);
+                    string output = Encoding.UTF8.GetString(incomingMessage[5..]);
+
+                    MatchCollection matches = escapeSequences.Matches(output);
+
+                    int[] escapeSequenceIndices = matches.SelectMany(x =>
+                    {
+                        List<int> indices = new();
+                        for (int i = x.Index; i < i + x.Length; i++)
+                        {
+                            indices.Add(i);
+                        }
+                        return indices;
+                    }).ToArray();
 
                     for (int i = 0; i < output.Length; i++)
                     {
+                        if (escapeSequenceIndices.Contains(i))
+                        {
+                            // Ignore for now...
+                            continue;
+                        }
+
                         char ch = output[i];
                         if (ch == 0x01)
                         {
-                            char[] escapeArgument = output[(i + 1)..(i + 5)];
+                            string escapeArgument = output[(i + 1)..(i + 5)];
                             i += 4;
                         }
                         else
@@ -129,14 +168,21 @@ namespace AndroidDebugBridge
                 {
                     ConsoleKeyInfo readKey = Console.ReadKey(true);
 
-                    byte[] buffer = Encoding.UTF8.GetBytes(readKey.KeyChar.ToString());
-                    byte[] StringLength = BitConverter.GetBytes(buffer.Length);
+                    if (readKey.KeyChar != '\0')
+                    {
+                        byte[] buffer = Encoding.UTF8.GetBytes(readKey.KeyChar.ToString());
+                        byte[] StringLength = BitConverter.GetBytes(buffer.Length);
 
-                    List<byte> consoleInputData = buffer.ToList();
-                    consoleInputData.Insert(0, 0x00);
-                    consoleInputData.InsertRange(1, StringLength);
+                        List<byte> consoleInputData = buffer.ToList();
+                        consoleInputData.Insert(0, 0x00);
+                        consoleInputData.InsertRange(1, StringLength);
 
-                    stream.Write(consoleInputData.ToArray());
+                        stream.Write(consoleInputData.ToArray());
+                    }
+                    else
+                    {
+
+                    }
                 }
             });
 
