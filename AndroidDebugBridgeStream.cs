@@ -22,6 +22,7 @@
 * SOFTWARE.
 */
 using System;
+using System.Diagnostics;
 using System.Threading;
 
 namespace AndroidDebugBridge
@@ -31,7 +32,7 @@ namespace AndroidDebugBridge
         private bool Disposed = false;
 
         private bool ReceivedOK = false;
-        private bool IsClosed = false;
+        public bool IsClosed = false;
 
         private readonly uint LocalIdentifier;
         private readonly string OpenString;
@@ -60,15 +61,20 @@ namespace AndroidDebugBridge
             {
                 IsClosed = true;
 
+                DataClosed?.Invoke(this, EventArgs.Empty);
+
                 Transport.SendMessage(AndroidDebugBridgeMessage.GetCloseMessage(LocalIdentifier, LocalIdentifier));
-                WaitForAcknowledgement();
+                //WaitForAcknowledgement();
             }
         }
 
         public void Write(byte[] buffer)
         {
-            Transport.SendMessage(AndroidDebugBridgeMessage.GetWriteMessage(LocalIdentifier, LocalIdentifier, buffer));
-            WaitForAcknowledgement();
+            if (!IsClosed)
+            {
+                Transport.SendMessage(AndroidDebugBridgeMessage.GetWriteMessage(LocalIdentifier, LocalIdentifier, buffer));
+                WaitForAcknowledgement();
+            }
         }
 
         internal bool HandleIncomingMessage(AndroidDebugBridgeMessage incomingMessage)
@@ -96,10 +102,10 @@ namespace AndroidDebugBridge
 
                             IsClosed = true;
 
+                            DataClosed?.Invoke(this, EventArgs.Empty);
+
                             // Send an OKAY back
                             SendAcknowledgement();
-
-                            DataClosed?.Invoke(this, EventArgs.Empty);
 
                             // Close ourselves too
                             Transport.SendMessage(AndroidDebugBridgeMessage.GetCloseMessage(LocalIdentifier, LocalIdentifier));
@@ -134,12 +140,18 @@ namespace AndroidDebugBridge
 
         public void WaitForAcknowledgement()
         {
-            while (!ReceivedOK)
+            if (!IsClosed)
             {
-                Thread.Sleep(100);
-            }
+                Debug.WriteLine("Entering WaitForAcknowledgement Loop!");
 
-            ReceivedOK = false;
+                while (!ReceivedOK)
+                {
+                    Thread.Sleep(100);
+                }
+                Debug.WriteLine("Leaving WaitForAcknowledgement Loop!");
+
+                ReceivedOK = false;
+            }
         }
 
         public void Dispose()

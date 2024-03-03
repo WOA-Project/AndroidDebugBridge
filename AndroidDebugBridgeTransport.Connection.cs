@@ -23,6 +23,7 @@
 */
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -31,7 +32,7 @@ namespace AndroidDebugBridge
 {
     public partial class AndroidDebugBridgeTransport
     {
-        private static bool IsConnected = false;
+        private bool IsConnected = false;
 
         private readonly RSACryptoServiceProvider RSACryptoServiceProvider = new(2048);
 
@@ -72,10 +73,14 @@ namespace AndroidDebugBridge
 
         public void WaitTilConnected()
         {
+            Debug.WriteLine("Entering WaitTilConnected Loop!");
+
             while (!IsConnected)
             {
                 Thread.Sleep(100);
             }
+
+            Debug.WriteLine("Leaving WaitTilConnected Loop!");
         }
     }
 }

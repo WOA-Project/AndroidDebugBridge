@@ -36,12 +36,19 @@ namespace AndroidDebugBridge
         public AndroidDebugBridgeStream OpenStream(string OpenString)
         {
             AndroidDebugBridgeStream stream = new(this, ++LocalId, OpenString);
-            Streams.Add(stream);
+            lock (Streams)
+            {
+                Streams.Add(stream);
+            }
+
             stream.Open();
 
             stream.DataClosed += (object? sender, EventArgs args) =>
             {
-                _ = Streams.Remove((sender as AndroidDebugBridgeStream)!);
+                lock (Streams)
+                {
+                    _ = Streams.Remove((sender as AndroidDebugBridgeStream)!);
+                }
             };
 
             return stream;
@@ -49,29 +56,41 @@ namespace AndroidDebugBridge
 
         private void IncomingMessageLoop()
         {
-            ReadMessageAsync((AndroidDebugBridgeMessage incomingMessage) =>
+            try
             {
-                HandleIncomingMessage(incomingMessage);
-                IncomingMessageLoop();
-            }, VerifyCrc: false);
+                ReadMessageAsync((AndroidDebugBridgeMessage incomingMessage) =>
+                {
+                    HandleIncomingMessage(incomingMessage);
+                    IncomingMessageLoop();
+                }, VerifyCrc: false);
+            }
+            catch
+            {
+
+            }
         }
 
         private void HandleIncomingMessage(AndroidDebugBridgeMessage incomingMessage)
         {
+            //Debug.WriteLine($"< new AndroidDebugBridgeMessage(AndroidDebugBridgeCommands.{incomingMessage.CommandIdentifier}, 0x{incomingMessage.FirstArgument:X8}, 0x{incomingMessage.FirstArgument:X8}, );");
+
             if (incomingMessage.CommandIdentifier is not AndroidDebugBridgeCommands.CNXN and not AndroidDebugBridgeCommands.AUTH)
             {
                 bool HandledExternally = false;
-                foreach (AndroidDebugBridgeStream stream in Streams)
+                lock (Streams)
                 {
-                    if (stream.RemoteIdentifier != 0 && stream.RemoteIdentifier == incomingMessage.FirstArgument)
+                    foreach (AndroidDebugBridgeStream stream in Streams.ToArray())
                     {
-                        HandledExternally = stream.HandleIncomingMessage(incomingMessage);
-                        break;
-                    }
-                    else if (stream.RemoteIdentifier == 0)
-                    {
-                        stream.RemoteIdentifier = incomingMessage.FirstArgument;
-                        HandledExternally = stream.HandleIncomingMessage(incomingMessage);
+                        if (stream.RemoteIdentifier != 0 && stream.RemoteIdentifier == incomingMessage.FirstArgument)
+                        {
+                            HandledExternally = stream.HandleIncomingMessage(incomingMessage);
+                            break;
+                        }
+                        else if (stream.RemoteIdentifier == 0)
+                        {
+                            stream.RemoteIdentifier = incomingMessage.FirstArgument;
+                            HandledExternally = stream.HandleIncomingMessage(incomingMessage);
+                        }
                     }
                 }
 
