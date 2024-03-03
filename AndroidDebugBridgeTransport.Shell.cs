@@ -210,146 +210,151 @@ namespace AndroidDebugBridge
             Debug.WriteLine("Leaving shell closed Loop!");
         }
 
+        private object ShellLock = new();
+
         public string Shell(string command)
         {
-            string ConsoleOutputString = string.Empty;
-            using AndroidDebugBridgeStream stream = OpenStream($"shell,v2,TERM=xterm-256color,pty:{command}");
-
-            stream.DataReceived += (object? sender, byte[] incomingMessage) =>
+            lock (ShellLock)
             {
-                // 0: STDIN
-                // 1: STDOUT
-                // 2: STDERR
-                // 3: EXIT
-                // 4: Close STDIN
-                // 5: Window Size Change
+                string ConsoleOutputString = string.Empty;
+                using AndroidDebugBridgeStream stream = OpenStream($"shell,v2,TERM=xterm-256color,pty:{command}");
 
-                Regex escapeSequences = new(@"(\x9D|\x1B\]).+(\x07|\x9c)|\x1b [F-Nf-n]|\x1b#[3-8]|\x1b%[@Gg]|\x1b[()*+][A-Za-z0-9=`<>]|\x1b[()*+]\""[>4?]|\x1b[()*+]%[0-6=]|\x1b[()*+]&[4-5]|\x1b[-.\/][ABFHLM]|\x1b[6-9Fcl-o=>\|\}~]|(\x9f|\x1b_).+\x9c|(\x90|\x1bP).+\x9c|(\x9B|\x1B\[)[0-?]*[ -\/]*[@-~]|(\x9e|\x1b\^).+\x9c|\x1b[DEHMNOVWXYZ78]");
-
-                byte messageType = incomingMessage[0];
-                if (messageType == 0)
+                stream.DataReceived += (object? sender, byte[] incomingMessage) =>
                 {
-                    // Can't do much here, STDIN is not writable ofc...
-                }
-                else if (messageType == 1)
-                {
-                    uint packetArgument = BitConverter.ToUInt32(incomingMessage[1..5]);
-                    string output = Encoding.UTF8.GetString(incomingMessage[5..]);
+                    // 0: STDIN
+                    // 1: STDOUT
+                    // 2: STDERR
+                    // 3: EXIT
+                    // 4: Close STDIN
+                    // 5: Window Size Change
 
-                    MatchCollection matches = escapeSequences.Matches(output);
+                    Regex escapeSequences = new(@"(\x9D|\x1B\]).+(\x07|\x9c)|\x1b [F-Nf-n]|\x1b#[3-8]|\x1b%[@Gg]|\x1b[()*+][A-Za-z0-9=`<>]|\x1b[()*+]\""[>4?]|\x1b[()*+]%[0-6=]|\x1b[()*+]&[4-5]|\x1b[-.\/][ABFHLM]|\x1b[6-9Fcl-o=>\|\}~]|(\x9f|\x1b_).+\x9c|(\x90|\x1bP).+\x9c|(\x9B|\x1B\[)[0-?]*[ -\/]*[@-~]|(\x9e|\x1b\^).+\x9c|\x1b[DEHMNOVWXYZ78]");
 
-                    int[] escapeSequenceIndices = matches.SelectMany(x =>
+                    byte messageType = incomingMessage[0];
+                    if (messageType == 0)
                     {
-                        List<int> indices = new();
-                        for (int i = x.Index; i < i + x.Length; i++)
-                        {
-                            indices.Add(i);
-                        }
-                        return indices;
-                    }).ToArray();
-
-                    for (int i = 0; i < output.Length; i++)
-                    {
-                        if (escapeSequenceIndices.Contains(i))
-                        {
-                            // Ignore for now...
-                            continue;
-                        }
-
-                        char ch = output[i];
-                        if (ch == 0x01)
-                        {
-                            string escapeArgument = output[(i + 1)..(i + 5)];
-                            i += 4;
-                        }
-                        else
-                        {
-                            ConsoleOutputString += ch;
-                        }
+                        // Can't do much here, STDIN is not writable ofc...
                     }
-
-                    (sender as AndroidDebugBridgeStream)?.SendAcknowledgement();
-                }
-                else if (messageType == 2)
-                {
-                    uint packetArgument = BitConverter.ToUInt32(incomingMessage[1..5]);
-                    string output = Encoding.UTF8.GetString(incomingMessage[5..]);
-
-                    MatchCollection matches = escapeSequences.Matches(output);
-
-                    int[] escapeSequenceIndices = matches.SelectMany(x =>
+                    else if (messageType == 1)
                     {
-                        List<int> indices = new();
-                        for (int i = x.Index; i < i + x.Length; i++)
-                        {
-                            indices.Add(i);
-                        }
-                        return indices;
-                    }).ToArray();
+                        uint packetArgument = BitConverter.ToUInt32(incomingMessage[1..5]);
+                        string output = Encoding.UTF8.GetString(incomingMessage[5..]);
 
-                    for (int i = 0; i < output.Length; i++)
-                    {
-                        if (escapeSequenceIndices.Contains(i))
+                        MatchCollection matches = escapeSequences.Matches(output);
+
+                        int[] escapeSequenceIndices = matches.SelectMany(x =>
                         {
-                            // Ignore for now...
-                            continue;
+                            List<int> indices = new();
+                            for (int i = x.Index; i < i + x.Length; i++)
+                            {
+                                indices.Add(i);
+                            }
+                            return indices;
+                        }).ToArray();
+
+                        for (int i = 0; i < output.Length; i++)
+                        {
+                            if (escapeSequenceIndices.Contains(i))
+                            {
+                                // Ignore for now...
+                                continue;
+                            }
+
+                            char ch = output[i];
+                            if (ch == 0x01)
+                            {
+                                string escapeArgument = output[(i + 1)..(i + 5)];
+                                i += 4;
+                            }
+                            else
+                            {
+                                ConsoleOutputString += ch;
+                            }
                         }
 
-                        char ch = output[i];
-                        if (ch == 0x01)
-                        {
-                            string escapeArgument = output[(i + 1)..(i + 5)];
-                            i += 4;
-                        }
-                        else
-                        {
-                            ConsoleOutputString += ch;
-                        }
+                        (sender as AndroidDebugBridgeStream)?.SendAcknowledgement();
                     }
+                    else if (messageType == 2)
+                    {
+                        uint packetArgument = BitConverter.ToUInt32(incomingMessage[1..5]);
+                        string output = Encoding.UTF8.GetString(incomingMessage[5..]);
 
-                    (sender as AndroidDebugBridgeStream)?.SendAcknowledgement();
-                }
-                else if (messageType == 3)
+                        MatchCollection matches = escapeSequences.Matches(output);
+
+                        int[] escapeSequenceIndices = matches.SelectMany(x =>
+                        {
+                            List<int> indices = new();
+                            for (int i = x.Index; i < i + x.Length; i++)
+                            {
+                                indices.Add(i);
+                            }
+                            return indices;
+                        }).ToArray();
+
+                        for (int i = 0; i < output.Length; i++)
+                        {
+                            if (escapeSequenceIndices.Contains(i))
+                            {
+                                // Ignore for now...
+                                continue;
+                            }
+
+                            char ch = output[i];
+                            if (ch == 0x01)
+                            {
+                                string escapeArgument = output[(i + 1)..(i + 5)];
+                                i += 4;
+                            }
+                            else
+                            {
+                                ConsoleOutputString += ch;
+                            }
+                        }
+
+                        (sender as AndroidDebugBridgeStream)?.SendAcknowledgement();
+                    }
+                    else if (messageType == 3)
+                    {
+                        // Close notification.
+                    }
+                    else if (messageType == 4)
+                    {
+                        // Close STDIN
+                    }
+                    else if (messageType == 5)
+                    {
+                        // Window size change
+                    }
+                    else
+                    {
+                        // Unknown message type
+                    }
+                };
+
+                // Configure terminal size
+                string terminalConfiguration = $"{500}x{500},0x0";
+
+                byte[] ConfigurationRes = Encoding.UTF8.GetBytes($"{terminalConfiguration}\0");
+                byte[] StringLength = BitConverter.GetBytes(ConfigurationRes.Length);
+
+                List<byte> consoleConfigurationData = ConfigurationRes.ToList();
+                consoleConfigurationData.Insert(0, 0x05);
+                consoleConfigurationData.InsertRange(1, StringLength);
+
+                stream.Write(consoleConfigurationData.ToArray());
+
+                Debug.WriteLine("Entering shell/cmd closed Loop!");
+
+                // Wait til the stream is closed
+                while (!stream.IsClosed)
                 {
-                    // Close notification.
+                    Thread.Sleep(100);
                 }
-                else if (messageType == 4)
-                {
-                    // Close STDIN
-                }
-                else if (messageType == 5)
-                {
-                    // Window size change
-                }
-                else
-                {
-                    // Unknown message type
-                }
-            };
 
-            // Configure terminal size
-            string terminalConfiguration = $"{500}x{500},0x0";
+                Debug.WriteLine("Leaving shell/cmd closed Loop!");
 
-            byte[] ConfigurationRes = Encoding.UTF8.GetBytes($"{terminalConfiguration}\0");
-            byte[] StringLength = BitConverter.GetBytes(ConfigurationRes.Length);
-
-            List<byte> consoleConfigurationData = ConfigurationRes.ToList();
-            consoleConfigurationData.Insert(0, 0x05);
-            consoleConfigurationData.InsertRange(1, StringLength);
-
-            stream.Write(consoleConfigurationData.ToArray());
-
-            Debug.WriteLine("Entering shell/cmd closed Loop!");
-
-            // Wait til the stream is closed
-            while (!stream.IsClosed)
-            {
-                Thread.Sleep(100);
+                return ConsoleOutputString;
             }
-
-            Debug.WriteLine("Leaving shell/cmd closed Loop!");
-
-            return ConsoleOutputString;
         }
     }
 }
