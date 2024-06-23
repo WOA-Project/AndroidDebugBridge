@@ -24,6 +24,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 
 namespace AndroidDebugBridge
 {
@@ -136,7 +137,8 @@ namespace AndroidDebugBridge
                         PhoneConnectionVariables = ConnectionVariables;
 
                         IsConnected = true;
-                        OnConnectionEstablished?.Invoke(this, EventArgs.Empty);
+                        new Thread(() => OnConnectionEstablished?.Invoke(this, EventArgs.Empty)).Start();
+
                         break;
                     }
                 case AndroidDebugBridgeCommands.AUTH:

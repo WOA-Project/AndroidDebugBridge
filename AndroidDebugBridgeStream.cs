@@ -158,14 +158,14 @@ namespace AndroidDebugBridge
         {
             if (!IsClosed)
             {
-                Debug.WriteLine("Entering WaitForAcknowledgement Loop!");
+                Debug.WriteLine($"Entering WaitForAcknowledgement Loop! RemoteIdentifier={RemoteIdentifier}");
 
                 while (!ReceivedOK && !IsFaulted && !IsClosed)
                 {
                     Thread.Sleep(100);
                 }
 
-                Debug.WriteLine("Leaving WaitForAcknowledgement Loop!");
+                Debug.WriteLine($"Leaving WaitForAcknowledgement Loop! RemoteIdentifier={RemoteIdentifier}");
 
                 if (ReceivedOK)
                 {

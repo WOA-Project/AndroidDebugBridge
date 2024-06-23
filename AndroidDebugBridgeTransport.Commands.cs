@@ -47,7 +47,7 @@ namespace AndroidDebugBridge
 
             try
             {
-                result = Shell($"getprop {variableName}");
+                result = Shell($"getprop {variableName}").TrimEnd('\n').TrimEnd('\r');
             }
             catch (Exception) { }
 
