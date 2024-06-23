@@ -30,9 +30,9 @@ namespace AndroidDebugBridge
 {
     public partial class AndroidDebugBridgeTransport
     {
-        private readonly USBDevice? USBDevice = null;
-        private readonly USBPipe? InputPipe = null;
-        private readonly USBPipe? OutputPipe = null;
+        private readonly USBDevice USBDevice = null;
+        private readonly USBPipe InputPipe = null;
+        private readonly USBPipe OutputPipe = null;
 
         private AndroidDebugBridgeMessage ReadMessage(bool VerifyCrc = true)
         {
@@ -55,12 +55,13 @@ namespace AndroidDebugBridge
 
                 return new AndroidDebugBridgeMessage(CommandIdentifier, FirstArgument, SecondArgument);
             }
-            catch { }
-
-            throw new Exception("Failed to read message!");
+            catch (Exception ex)
+            {
+                throw new AggregateException("Failed to read message!", ex);
+            }
         }
 
-        private void ReadMessageAsync(Action<AndroidDebugBridgeMessage> asyncCallback, bool VerifyCrc = true)
+        private void ReadMessageAsync(Action<AndroidDebugBridgeMessage> asyncCallback, Action<Exception> exceptionAsyncCallback, bool VerifyCrc = true)
         {
             byte[] IncomingMessage = new byte[24];
             ReadFromUsbAsync(IncomingMessage, (asyncReadCallback) =>
@@ -80,15 +81,18 @@ namespace AndroidDebugBridge
                             }
 
                             asyncCallback.Invoke(new AndroidDebugBridgeMessage(CommandIdentifier, FirstArgument, SecondArgument, Payload));
-                        }, asyncReadCallback.AsyncState);
+                        }, exceptionAsyncCallback, asyncReadCallback.AsyncState);
                     }
                     else
                     {
                         asyncCallback.Invoke(new AndroidDebugBridgeMessage(CommandIdentifier, FirstArgument, SecondArgument));
                     }
                 }
-                catch { }
-            });
+                catch (Exception ex)
+                {
+                    exceptionAsyncCallback(ex);
+                }
+            }, exceptionAsyncCallback);
         }
 
         private byte[] ReadFromUsb(uint size)
@@ -102,12 +106,12 @@ namespace AndroidDebugBridge
                     _ = InputPipe.Read(buffer);
                     break;
                 }
-                catch
+                catch (Exception ex)
                 {
                     attempts++;
                     if (attempts > 10)
                     {
-                        throw new Exception("Failed to read from USB device!");
+                        throw new AggregateException("Failed to read from USB device!", ex);
                     }
                     Thread.Sleep(100);
                     Debug.WriteLine("Failed to read from input pipe, trying again. Attempt=" + attempts);
@@ -117,60 +121,45 @@ namespace AndroidDebugBridge
             return buffer;
         }
 
-        private void ReadFromUsbAsync(byte[] buffer, AsyncCallback asyncCallback, object? stateObject = null)
+        private void ReadFromUsbAsync(byte[] buffer, AsyncCallback asyncCallback, Action<Exception> exceptionAsyncCallback, object? stateObject = null)
         {
-            try
+            InputPipe.BeginRead(buffer, 0, buffer.Length, (asyncWriteState) =>
             {
-                InputPipe.BeginRead(buffer, 0, buffer.Length, (asyncWriteState) =>
+                try
                 {
-                    try
-                    {
-                        InputPipe.EndRead(asyncWriteState);
-                        asyncCallback(asyncWriteState);
-                    }
-                    catch
-                    {
-
-                    }
-                }, stateObject);
-            }
-            catch
-            {
-
-            }
+                    InputPipe.EndRead(asyncWriteState);
+                    asyncCallback(asyncWriteState);
+                }
+                catch (Exception ex)
+                {
+                    exceptionAsyncCallback(ex);
+                }
+            }, stateObject);
         }
 
         internal void SendMessage(AndroidDebugBridgeMessage outgoingMessage)
         {
-            try
+            //Debug.WriteLine($"> new AndroidDebugBridgeMessage(AndroidDebugBridgeCommands.{outgoingMessage.CommandIdentifier}, 0x{outgoingMessage.FirstArgument:X8}, 0x{outgoingMessage.FirstArgument:X8}, );");
+
+            byte[] OutgoingMessage = AndroidDebugBridgeMessaging.GetCommandPacket(outgoingMessage.CommandIdentifier, outgoingMessage.FirstArgument, outgoingMessage.SecondArgument, outgoingMessage.Payload);
+            WriteToUsb(OutgoingMessage);
+
+            if (outgoingMessage.Payload != null)
             {
-                //Debug.WriteLine($"> new AndroidDebugBridgeMessage(AndroidDebugBridgeCommands.{outgoingMessage.CommandIdentifier}, 0x{outgoingMessage.FirstArgument:X8}, 0x{outgoingMessage.FirstArgument:X8}, );");
-
-                byte[] OutgoingMessage = AndroidDebugBridgeMessaging.GetCommandPacket(outgoingMessage.CommandIdentifier, outgoingMessage.FirstArgument, outgoingMessage.SecondArgument, outgoingMessage.Payload);
-                WriteToUsb(OutgoingMessage);
-
-                if (outgoingMessage.Payload != null)
-                {
-                    WriteToUsb(outgoingMessage.Payload);
-                }
+                WriteToUsb(outgoingMessage.Payload);
             }
-            catch { }
         }
 
-        private void SendMessageAsync(AndroidDebugBridgeMessage androidDebugBridgeMessage, Action? asyncCallback = null)
+        private void SendMessageAsync(AndroidDebugBridgeMessage androidDebugBridgeMessage, Action? asyncCallback = null, Action<Exception> exceptionAsyncCallback = null)
         {
-            try
+            byte[] OutgoingMessage = AndroidDebugBridgeMessaging.GetCommandPacket(androidDebugBridgeMessage.CommandIdentifier, androidDebugBridgeMessage.FirstArgument, androidDebugBridgeMessage.SecondArgument, androidDebugBridgeMessage.Payload);
+            WriteToUsbAsync(OutgoingMessage, (asyncWriteObject) =>
             {
-                byte[] OutgoingMessage = AndroidDebugBridgeMessaging.GetCommandPacket(androidDebugBridgeMessage.CommandIdentifier, androidDebugBridgeMessage.FirstArgument, androidDebugBridgeMessage.SecondArgument, androidDebugBridgeMessage.Payload);
-                WriteToUsbAsync(OutgoingMessage, (asyncWriteObject) =>
+                if (androidDebugBridgeMessage.Payload != null)
                 {
-                    if (androidDebugBridgeMessage.Payload != null)
-                    {
-                        WriteToUsbAsync(androidDebugBridgeMessage.Payload, (_) => asyncCallback?.Invoke(), asyncWriteObject.AsyncState);
-                    }
-                });
-            }
-            catch { }
+                    WriteToUsbAsync(androidDebugBridgeMessage.Payload, (_) => asyncCallback?.Invoke(), exceptionAsyncCallback, asyncWriteObject.AsyncState);
+                }
+            }, exceptionAsyncCallback);
         }
 
         private void WriteToUsb(byte[] buffer)
@@ -183,12 +172,12 @@ namespace AndroidDebugBridge
                     OutputPipe.Write(buffer);
                     break;
                 }
-                catch
+                catch (Exception ex)
                 {
                     attempts++;
                     if (attempts > 10)
                     {
-                        throw new Exception("Failed to write to USB device!");
+                        throw new AggregateException("Failed to write to USB device!", ex);
                     }
                     Thread.Sleep(100);
                     Debug.WriteLine("Failed to write to output pipe, trying again. Attempt=" + attempts);
@@ -196,27 +185,20 @@ namespace AndroidDebugBridge
             }
         }
 
-        private void WriteToUsbAsync(byte[] buffer, AsyncCallback asyncCallback, object? stateObject = null)
+        private void WriteToUsbAsync(byte[] buffer, AsyncCallback asyncCallback, Action<Exception> exceptionAsyncCallback, object? stateObject = null)
         {
-            try
-            {
-                OutputPipe.BeginWrite(buffer, 0, buffer.Length, (asyncWriteState) =>
+            OutputPipe.BeginWrite(buffer, 0, buffer.Length, (asyncWriteState) =>
             {
                 try
                 {
                     OutputPipe.EndWrite(asyncWriteState);
                     asyncCallback(asyncWriteState);
                 }
-                catch
+                catch (Exception ex)
                 {
-
+                    exceptionAsyncCallback(ex);
                 }
             }, stateObject);
-            }
-            catch
-            {
-
-            }
         }
     }
 }

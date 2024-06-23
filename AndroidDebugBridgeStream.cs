@@ -32,7 +32,9 @@ namespace AndroidDebugBridge
         private bool Disposed = false;
 
         private bool ReceivedOK = false;
+        public Exception? ReceivedException = null;
         public bool IsClosed = false;
+        public bool IsFaulted = false;
 
         private readonly uint LocalIdentifier;
         private readonly string OpenString;
@@ -63,7 +65,12 @@ namespace AndroidDebugBridge
 
                 DataClosed?.Invoke(this, EventArgs.Empty);
 
-                Transport.SendMessage(AndroidDebugBridgeMessage.GetCloseMessage(LocalIdentifier, LocalIdentifier));
+                // This can fail when the USB connection is dropped
+                try
+                {
+                    Transport.SendMessage(AndroidDebugBridgeMessage.GetCloseMessage(LocalIdentifier, LocalIdentifier));
+                }
+                catch { }
                 //WaitForAcknowledgement();
             }
         }
@@ -75,6 +82,15 @@ namespace AndroidDebugBridge
                 Transport.SendMessage(AndroidDebugBridgeMessage.GetWriteMessage(LocalIdentifier, LocalIdentifier, buffer));
                 WaitForAcknowledgement();
             }
+        }
+
+        internal void HandleIncomingException(Exception ex)
+        {
+            ReceivedException = ex;
+            IsFaulted = true;
+
+            IsClosed = true;
+            DataClosed?.Invoke(this, EventArgs.Empty);
         }
 
         internal bool HandleIncomingMessage(AndroidDebugBridgeMessage incomingMessage)
@@ -144,13 +160,17 @@ namespace AndroidDebugBridge
             {
                 Debug.WriteLine("Entering WaitForAcknowledgement Loop!");
 
-                while (!ReceivedOK)
+                while (!ReceivedOK && !IsFaulted && !IsClosed)
                 {
                     Thread.Sleep(100);
                 }
+
                 Debug.WriteLine("Leaving WaitForAcknowledgement Loop!");
 
-                ReceivedOK = false;
+                if (ReceivedOK)
+                {
+                    ReceivedOK = false;
+                }
             }
         }
 

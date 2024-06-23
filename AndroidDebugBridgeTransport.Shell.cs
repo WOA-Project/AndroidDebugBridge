@@ -351,6 +351,11 @@ namespace AndroidDebugBridge
                     Thread.Sleep(100);
                 }
 
+                if (stream.IsFaulted)
+                {
+                    throw stream.ReceivedException ?? new Exception("Stream caught an unknown exception!");
+                }
+
                 Debug.WriteLine("Leaving shell/cmd closed Loop!");
 
                 return ConsoleOutputString;

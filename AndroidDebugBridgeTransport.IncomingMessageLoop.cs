@@ -56,18 +56,20 @@ namespace AndroidDebugBridge
 
         private void IncomingMessageLoop()
         {
-            try
+            ReadMessageAsync((AndroidDebugBridgeMessage incomingMessage) =>
             {
-                ReadMessageAsync((AndroidDebugBridgeMessage incomingMessage) =>
+                HandleIncomingMessage(incomingMessage);
+                IncomingMessageLoop();
+            }, (Exception ex) =>
+            {
+                lock (Streams)
                 {
-                    HandleIncomingMessage(incomingMessage);
-                    IncomingMessageLoop();
-                }, VerifyCrc: false);
-            }
-            catch
-            {
-
-            }
+                    foreach (AndroidDebugBridgeStream stream in Streams.ToArray())
+                    {
+                        stream.HandleIncomingException(ex);
+                    }
+                }
+            }, VerifyCrc: false);
         }
 
         private void HandleIncomingMessage(AndroidDebugBridgeMessage incomingMessage)
