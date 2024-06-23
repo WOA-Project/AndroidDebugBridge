@@ -131,6 +131,7 @@ namespace AndroidDebugBridge
                         PhoneConnectionVariables = ConnectionVariables;
 
                         IsConnected = true;
+                        OnConnectionEstablished?.Invoke(this, EventArgs.Empty);
                         break;
                     }
                 case AndroidDebugBridgeCommands.AUTH:

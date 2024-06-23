@@ -30,9 +30,12 @@ namespace AndroidDebugBridge
     public partial class AndroidDebugBridgeTransport : IDisposable
     {
         private bool Disposed = false;
+        public event EventHandler? OnConnectionEstablished = null;
+        public readonly string DevicePath;
 
         public AndroidDebugBridgeTransport(string DevicePath)
         {
+            this.DevicePath = DevicePath;
             PhoneConnectionEnvironment = "";
             PhoneConnectionVariables = new Dictionary<string, string>();
             PhoneConnectionFeatures = Array.Empty<string>();

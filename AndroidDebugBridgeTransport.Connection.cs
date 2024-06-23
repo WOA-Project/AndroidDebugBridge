@@ -32,7 +32,7 @@ namespace AndroidDebugBridge
 {
     public partial class AndroidDebugBridgeTransport
     {
-        private bool IsConnected = false;
+        public bool IsConnected { get; private set; } = false;
 
         private readonly RSACryptoServiceProvider RSACryptoServiceProvider = new(2048);
 
