@@ -36,6 +36,11 @@ namespace AndroidDebugBridge
     {
         public void Shell()
         {
+            if (!IsConnected)
+            {
+                throw new Exception("Cannot open a shell with no accepted connection!");
+            }
+
             using AndroidDebugBridgeStream stream = OpenStream("shell,v2,TERM=xterm-256color,pty:");
 
             stream.DataReceived += (object? sender, byte[] incomingMessage) =>
@@ -214,6 +219,11 @@ namespace AndroidDebugBridge
 
         public string Shell(string command)
         {
+            if (!IsConnected)
+            {
+                throw new Exception("Cannot open a shell with a specific command with no accepted connection!");
+            }
+
             lock (ShellLock)
             {
                 string ConsoleOutputString = string.Empty;

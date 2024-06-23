@@ -21,27 +21,49 @@
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 * SOFTWARE.
 */
+using System;
+
 namespace AndroidDebugBridge
 {
     public partial class AndroidDebugBridgeTransport
     {
         public void Reboot(string mode = "")
         {
+            if (!IsConnected)
+            {
+                throw new Exception("Cannot reboot with no accepted connection!");
+            }
+
             using AndroidDebugBridgeStream stream = OpenStream($"reboot:{mode}");
         }
 
         public void RebootBootloader()
         {
+            if (!IsConnected)
+            {
+                throw new Exception("Cannot reboot to bootloader with no accepted connection!");
+            }
+
             Reboot("bootloader");
         }
 
         public void RebootRecovery()
         {
+            if (!IsConnected)
+            {
+                throw new Exception("Cannot reboot to recovery with no accepted connection!");
+            }
+
             Reboot("recovery");
         }
 
         public void RebootFastBootD()
         {
+            if (!IsConnected)
+            {
+                throw new Exception("Cannot reboot to fastbootd with no accepted connection!");
+            }
+
             Reboot("fastboot");
         }
     }

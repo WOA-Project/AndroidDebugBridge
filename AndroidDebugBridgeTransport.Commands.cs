@@ -7,6 +7,11 @@ namespace AndroidDebugBridge
     {
         public (string variableName, string variableValue)[]? GetAllVariables()
         {
+            if (!IsConnected)
+            {
+                throw new Exception("Cannot get all variables with no accepted connection!");
+            }
+
             (string variableName, string variableValue)[]? result = null;
 
             try
@@ -33,6 +38,11 @@ namespace AndroidDebugBridge
 
         public string? GetVariableValue(string variableName)
         {
+            if (!IsConnected)
+            {
+                throw new Exception("Cannot get a specific variable with no accepted connection!");
+            }
+
             string? result = null;
 
             try

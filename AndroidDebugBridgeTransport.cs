@@ -31,7 +31,7 @@ namespace AndroidDebugBridge
     {
         private bool Disposed = false;
         public event EventHandler? OnConnectionEstablished = null;
-        public readonly string DevicePath;
+        public string DevicePath { get; }
 
         public AndroidDebugBridgeTransport(string DevicePath)
         {

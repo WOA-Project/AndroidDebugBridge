@@ -36,24 +36,49 @@ namespace AndroidDebugBridge
 
         private readonly RSACryptoServiceProvider RSACryptoServiceProvider = new(2048);
 
-        public uint PhoneSupportedProtocolVersion
+        private uint PhoneSupportedProtocolVersion;
+        private string PhoneConnectionEnvironment;
+        private IReadOnlyDictionary<string, string> PhoneConnectionVariables;
+        private IReadOnlyList<string> PhoneConnectionFeatures;
+
+        public uint GetPhoneSupportedProtocolVersion()
         {
-            get; private set;
+            if (!IsConnected)
+            {
+                throw new Exception("Cannot get the phone supported protocol version with no accepted connection!");
+            }
+
+            return PhoneSupportedProtocolVersion;
         }
 
-        public string PhoneConnectionEnvironment
+        public string GetPhoneConnectionEnvironment()
         {
-            get; private set;
+            if (!IsConnected)
+            {
+                throw new Exception("Cannot get the phone connection environment with no accepted connection!");
+            }
+
+            return PhoneConnectionEnvironment; 
         }
 
-        public IReadOnlyDictionary<string, string> PhoneConnectionVariables
+        public IReadOnlyDictionary<string, string> GetPhoneConnectionVariables()
         {
-            get; private set;
+            if (!IsConnected)
+            {
+                throw new Exception("Cannot get the phone connection variables with no accepted connection!");
+            }
+
+            return PhoneConnectionVariables;
         }
 
-        public IReadOnlyList<string> PhoneConnectionFeatures
+        public IReadOnlyList<string> GetPhoneConnectionFeatures()
         {
-            get; private set;
+            if (!IsConnected)
+            {
+                throw new Exception("Cannot get the phone connection features with no accepted connection!");
+            }
+
+            return PhoneConnectionFeatures;
         }
 
         private byte[] GetAdbPublicKeyPayload()
@@ -66,6 +91,11 @@ namespace AndroidDebugBridge
 
         public void Connect()
         {
+            if (IsConnected)
+            {
+                throw new Exception("Cannot connect to an already connected device!");
+            }
+
             // -> CNXN + System Information
             AndroidDebugBridgeMessage ConnectMessage = AndroidDebugBridgeMessage.GetConnectMessage();
             SendMessage(ConnectMessage);

@@ -35,6 +35,11 @@ namespace AndroidDebugBridge
 
         public AndroidDebugBridgeStream OpenStream(string OpenString)
         {
+            if (!IsConnected)
+            {
+                throw new Exception("Cannot open a stream on a device with no accepted connection!");
+            }
+
             AndroidDebugBridgeStream stream = new(this, ++LocalId, OpenString);
             lock (Streams)
             {
