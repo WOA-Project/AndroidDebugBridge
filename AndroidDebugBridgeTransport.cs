@@ -24,6 +24,7 @@
 using MadWizard.WinUSBNet;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace AndroidDebugBridge
 {
@@ -40,6 +41,10 @@ namespace AndroidDebugBridge
             PhoneConnectionVariables = new Dictionary<string, string>();
             PhoneConnectionFeatures = Array.Empty<string>();
             PhoneSupportedProtocolVersion = 0;
+
+            // adb.exe starts a daemon which would lock up the connection
+            // Kill any instance so we can communicate with the device.
+            KillAnyADBInstance();
 
             USBDevice = new USBDevice(DevicePath);
 
@@ -62,6 +67,21 @@ namespace AndroidDebugBridge
             }
 
             IncomingMessageLoop();
+        }
+
+        private static void KillAnyADBInstance()
+        {
+            Process proc = new()
+            {
+                StartInfo = new("taskkill.exe", "/IM adb.exe /F")
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WindowStyle = ProcessWindowStyle.Hidden
+                }
+            };
+            proc.Start();
+            proc.WaitForExit();
         }
 
         public void Dispose()
