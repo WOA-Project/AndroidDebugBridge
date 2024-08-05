@@ -66,5 +66,25 @@ namespace AndroidDebugBridge
 
             Reboot("fastboot");
         }
+
+        public void RebootSideload()
+        {
+            if (!IsConnected)
+            {
+                throw new Exception("Cannot reboot to sideload with no accepted connection!");
+            }
+
+            Reboot("sideload");
+        }
+
+        public void RebootEDL()
+        {
+            if (!IsConnected)
+            {
+                throw new Exception("Cannot reboot to edl with no accepted connection!");
+            }
+
+            Reboot("edl");
+        }
     }
 }
