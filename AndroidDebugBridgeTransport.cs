@@ -63,6 +63,7 @@ namespace AndroidDebugBridge
 
             if (InputPipe == null || OutputPipe == null)
             {
+                USBDevice.Dispose();
                 throw new Exception("Invalid USB device!");
             }
 

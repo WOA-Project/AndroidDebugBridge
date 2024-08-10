@@ -93,6 +93,7 @@ namespace AndroidDebugBridge
         {
             if (IsConnected)
             {
+                new Thread(() => OnConnectionEstablished?.Invoke(this, EventArgs.Empty)).Start();
                 throw new Exception("Cannot connect to an already connected device!");
             }
 

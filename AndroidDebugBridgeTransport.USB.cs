@@ -123,18 +123,25 @@ namespace AndroidDebugBridge
 
         private void ReadFromUsbAsync(byte[] buffer, AsyncCallback asyncCallback, Action<Exception> exceptionAsyncCallback, object? stateObject = null)
         {
-            InputPipe.BeginRead(buffer, 0, buffer.Length, (asyncWriteState) =>
+            try
             {
-                try
+                InputPipe.BeginRead(buffer, 0, buffer.Length, (asyncWriteState) =>
                 {
-                    InputPipe.EndRead(asyncWriteState);
-                    asyncCallback(asyncWriteState);
-                }
-                catch (Exception ex)
-                {
-                    exceptionAsyncCallback(ex);
-                }
-            }, stateObject);
+                    try
+                    {
+                        InputPipe.EndRead(asyncWriteState);
+                        asyncCallback(asyncWriteState);
+                    }
+                    catch (Exception ex)
+                    {
+                        exceptionAsyncCallback(ex);
+                    }
+                }, stateObject);
+            }
+            catch (Exception ex)
+            {
+                exceptionAsyncCallback(ex);
+            }
         }
 
         internal void SendMessage(AndroidDebugBridgeMessage outgoingMessage)
